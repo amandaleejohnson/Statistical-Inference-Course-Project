@@ -1,0 +1,247 @@
+---
+title: "Statistical Inference Course Project"
+author: "A. Johnson"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+        html_document:
+        keep_md: true
+---
+
+## Synopsis ##
+
+The project consists of two parts:
+
+        - A simulation exercise
+        
+        - Basic inferential data analysis
+
+Given the nature of the series, I used knitr to create the reports and convert to a pdf. The pdf report was limited to be no more than 3 pages with 3 pages of supporting appendix material if needed (code, figures, etc.). 
+
+## Review Criteria ##
+        
+The project required us to answer the following questions:
+
+        - What were the basic features of the data? 
+        
+        - Where was the distribution centered and how did it compare to the theoretical center of the distribution?
+        
+        - What was the sample variance and how did it compare to the theoretical variance of the distribution?
+        
+        - When is it appropriate to present confidence intervals and/or tests? 
+        
+        - What assumptions are needed for additional context in the conclusions? 
+
+```{r libs, include = FALSE}
+        # include = FALSE means this block won't be displayed
+        #This block will not be shown in the report
+
+        options(scipen=999) #Prevents the numbers from being displayed in scientific notation
+
+        library(R.utils)
+        library(rmarkdown)
+        library(knitr)
+        library(tidyverse)
+        library(ggplot2)
+        library(gridExtra)
+        library(UsingR)
+        # Adding a block that allows us to automatically save the figures in a folder to github
+        knitr::opts_chunk$set(echo = TRUE)
+        
+        knitr::opts_chunk$set( fig.path = "figures/fig-")
+        
+        Sys.setlocale("LC_TIME", "English")
+        
+
+```
+
+## Part 1: Simulation Exercise Instructions ##
+
+In this project I investigated the exponential distribution in R and compared it with the Central Limit Theorem. The exponential distribution can be simulated in R with rexp(n, lambda) where lambda is the rate parameter. The mean of exponential distribution is 1/lambda and the standard deviation is also 1/lambda. I've set lambda = 0.2 for all of the simulations. I also investigated the distribution of averages of 40 exponentials and completed 1,000 simulations. Note - Before starting, I installed and loaded the following packages in R: R.utils, rmarkdown, knitr, tidyverse, ggplot2, and UsingR. 
+
+I illustrated via simulation and associated explanatory text the properties of the distribution of the mean of 40 exponentials:
+
+ - Displayed the sample mean and compared it to the theoretical mean of the distribution.
+ - Demonstrated how variable the sample is (via variance) and compared it to the theoretical variance of the distribution.
+ - Displayed that the distribution is approximately normal.
+
+```{r EDA}
+
+        # Using pre-defined parameters
+        lambda = 0.2
+        n = 40
+        sims = 1:1000
+        set.seed(1234)
+
+        
+        # From directions: 
+        # The exponential distribution can be simulated in R with rexp(n, lambda) 
+        # where lambda is the rate parameter. 
+        # The mean of exponential distribution is 1/lambda and the standard deviation is also 1/lambda.
+        
+        # Simulate the population:
+        pop = data.frame(x=sapply(sims, function(x) {
+                mean(rexp(n, lambda))
+        }))
+```
+
+```{r EDAhisto, warning = FALSE, message= FALSE}
+        # Plot the histogram
+        ggplot(pop, aes(x=x)) +
+                geom_histogram(aes(y=..count.., fill=..count..), 
+                               color = "black") + 
+                labs(title="Distribution of Means of 40 Exponentials ~ 1000 Simulations", 
+                     y="Frequency Count", x="Mean")
+```        
+
+I used the pre-defined parameters and set the seed at 1234. By sampling without replacement, the plot visualizes that the mean is around 5. The distribution in the plot seems to be approximating a normal distribution, however, there is uneven distribution in the tails.
+        
+```{r compare}        
+# Show the sample mean and compare it to the theoretical mean of the distribution.
+        sample.mean = round(mean(pop$x), 2)
+        theo.mean = round(1/lambda, 2)
+        cbind(sample.mean, theo.mean)
+```        
+
+The sample mean (`r sample.mean`) approximates the theoretical mean (`r theo.mean`).
+        
+```{r ci}        
+# Check the 95% confidence interval for the sample mean
+        t.test(pop$x)
+        ci = t.test(pop$x)$conf
+        lowerci = round(ci[1], 2)
+        upperci = round(ci[2], 2)
+```        
+
+The 95% CI for the sample mean (`r lowerci`, `r upperci`) includes the theoretical mean (`r theo.mean`).
+        
+```{r variance}        
+# Show how variable the sample is (via variance) and compare it to the theoretical variance of the 
+# distribution.
+        
+        sample.var = round(var(pop$x), 2)
+        theo.var = round(((1/lambda)^2)/n, 2)
+        cbind(sample.var, theo.var)
+```
+
+The sample variance (`r sample.var`) and the theoretical variance (`r theo.var`) are pretty close to each other.
+
+```{r dist, warning = FALSE, message= FALSE}
+# Show that the distribution is approximately normal.
+        
+         # Plot the sample mean and var vs. theoretical mean and var:
+        #We need to plot the density rather than the count because we are 
+        #also plotting the geom_vlines. These would be flattened 
+        #on the bottom of the y-axis (<1) if the y-axis was count.
+        ggplot(pop, aes(x=x)) +
+                geom_histogram(aes(y=..density.., fill = ..density..), 
+                               color = "black") +
+                labs(title="Sample Distribution of Means of 40 Exponentials ~ 1000 Simulations Against Theoretical Distribution of Means", 
+                     y = "Density", 
+                     x = "Mean", 
+                     caption = "Black = Sample Mean, Red = Theoretical Mean") +
+                geom_density(color = "black") +
+                geom_vline(xintercept = sample.mean, color = "black", linetype = "dashed", show.legend = TRUE) +
+                stat_function(fun = dnorm, args = list(mean = 1/lambda, sd = sqrt(theo.var)), 
+                              color = "red") +
+                geom_vline(xintercept = theo.mean, color = "red", linetype = "dashed", show.legend = TRUE)
+                
+```        
+
+Evaluating the figure, the distribution of the sample mean for 40 exponentials simulated 1000 times approximates the theoretical mean for a normal distribution. You can see this by comparing the shape of the black line compared to the shape of the red line. The mean from the sample mean distribution (black vertical dashed line) is slightly lower than the mean from the theoretical mean distribution (red vertical dashed line). 
+        
+## Part 2: Basic Inferential Data Analysis Instructions ##
+In the second portion of the project, I analyzed the ToothGrowth data in the R datasets package.
+
+```{r loadingtooth}        
+        data(ToothGrowth)
+```        
+
+First, I wanted to see a basic summary of the data:
+
+```{r sum}
+        # Provide a basic summary of the data.
+        str(ToothGrowth)
+        summary(ToothGrowth)
+        summary(ToothGrowth$len ~ ToothGrowth$supp)
+        summary(ToothGrowth$len ~ ToothGrowth$dose)
+        
+```
+
+This dataframe includes n=60 observations and contains three variables: len, supp, and dose. The supp variable is two-levels, "OJ" and "VC", each containing n=30 observations. The len variable is numeric with a range of 4.20-33.90. The dose variable is also numeric with a range of 0.5-2.0. After some quick googling, I know that len is "Tooth Length", supp is "Vitamin Supplement Type", and dose is "Dose (in milligrams)". 
+
+Here is a visual of the differences in tooth length by dose and supplement type:
+
+```{r qplot}
+        qplot(supp,len,data=ToothGrowth, facets=~dose, 
+              main="Tooth length by supplement type and dosage (mg)", 
+              xlab="Supplement type", ylab="Tooth length") + 
+        geom_boxplot(aes(fill = supp))
+        
+```
+
+As you can see, the boxes of the supplement types overlap within the 0.5mg dose and the 2mg dose. It appears that the biggest difference in tooth length appears between the supplement types when given the 1mg dose. Overall, tooth length was highest in the 2mg dose group, regardless of supplement type administered.
+
+Since it appears the variances of tooth growth differ by supplement and possibly by dose, we will need to perform Welch's t-tests for unequal variances when comparing tooth length by supplement and by dose.
+
+The type of hypothesis testing performed below assumes the following:
+ - Variables are independent and identically distributed (IID)
+ - Variances of tooth growth differ by supplement and dose
+ - The distribution of tooth growth is normal/gaussian
+
+I compared tooth growth (len) by type of vitamin supplement (supp) using hypothesis test with H0 = no difference in tooth growth by vitamin supplement.
+
+```{r ttest}
+
+# Use confidence intervals and/or hypothesis tests to compare tooth growth by supp and dose. 
+# (Only use the techniques from class, even if there's other approaches worth considering)
+        #Since the variances appear to be unequal, we need a Welch's t-test:
+        t.test(len ~ supp, paired = FALSE, var.equal = FALSE, data = ToothGrowth)
+        ttest = t.test(len ~ supp, paired = FALSE, var.equal = FALSE, data = ToothGrowth)
+        length(ttest)
+        pvalue = round(ttest$p.value, 9)
+```
+
+Since the p-value associted with this test (`r pvalue`) >0.05, we fail to reject the null that average tooth length is significantly different by supplement type. 
+
+However, what if our null hypothesis is that those taking the OJ supplement will have greater tooth growth than those taking the VC supplement?
+
+In this test, we specify a one-sided test:
+
+```{r oneside}
+#What about a hypothesis that mean tooth length is greater when given the OJ supplement?
+        oneside = t.test(len ~ supp, alternative = "greater", paired = FALSE, var.equal = FALSE, data = ToothGrowth)
+        pvalueone = round(oneside$p.value, 9)
+```
+
+Performing a one-sided test, we find a significant p-value of `r pvalueone` < 0.05, so we reject the null hypothesis that the true difference in means is not greater than 0. This supports that on average, those in the OJ supplement group have greater tooth length than those in the VC supplement group. 
+
+Next, I examined whether tooth growth was significantly different by dose with H0 = no difference in tooth growth by dose. Note - Due to the project specifications, I will need to produce multiple t-tests instead of an ANOVA or regression.
+
+```{r dose}      
+
+        #THe variance for the 0.5 dose looks slightly larger, so use unequal just to be safe
+        #we first need to compare the 0.5 dose vs. the 1.0 dose, 
+        #then the 1.0 dose vs. the 2.0 dose, then the 0.5 dose vs. 2.0 dose
+        
+        #First, create three subsets so that dose is only two levels:
+        # using subset function
+        halfvsone = subset(ToothGrowth, dose<2) 
+        
+        onevstwo = subset(ToothGrowth, dose>0.5)
+        
+        halfvstwo = subset(ToothGrowth, dose==0.5 | dose==2)
+        
+        #0.5 vs 1 mg:
+        halfvsonetest = t.test(len ~ dose, paired = FALSE, var.equal = FALSE, data = halfvsone)
+        p.5vs1 = round(halfvsonetest$p.value, 7)
+        
+        #1 vs 2 mg:
+        onevstwotest = t.test(len ~ dose, paired = FALSE, var.equal = FALSE, data = onevstwo)
+        p1vs2 = round(onevstwotest$p.value, 5)
+        
+        #0.5 vs 2 mg:
+        halfvstwotest = t.test(len ~ dose, paired = FALSE, var.equal = FALSE, data = halfvstwo)
+        p.5vs2 = halfvstwotest$p.value
+```        
+
+As you can see by the output in the t-tests, dose level significantly impacts the average tooth length and we reject the null hypotheses in all the tests (that dose does not impact tooth length). Those who were given the 0.5 mg dose had a significantly lower average tooth length compared to those given the 1.0 mg dose (p = `r p.5vs1`) or those given the 2.0 mg dose (p ~ 0.0000). Furthermore, those given the 1.0 mg dose had a significantly lower average tooth length compared to those given the 2.0 mg dose (p = `r p1vs2`). In sum, higher dose = greater tooth length.
